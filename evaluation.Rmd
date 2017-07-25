@@ -1,0 +1,40 @@
+---
+  title: "Evaluation"
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(PortalDataSummaries)
+source("forecast_tools.R")
+```
+
+## How did we do the past few months?
+
+Recent forecasts and the actual observations
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+obs_data = PortalDataSummaries::abundance()
+obs_data$total = rowSums(select(obs_data, -period))
+new_moon_file = PortalDataSummaries::FullPath('PortalData/Rodents/moon_dates.csv', 
+                                                  '~')
+new_moons = read.csv(new_moon_file)
+obs_data_newmoon = inner_join(obs_data, new_moons, by = c("period" = "Period"))
+
+#Get the 3 most recent forecasts
+for_data = compile_forecasts() %>%
+  dplyr::filter(level == 'All', model == 'Ensemble', species == 'total') %>%
+  dplyr::group_by(initial_newmoon) %>%
+  dplyr::top_n(30, initial_newmoon) %>%
+  dplyr::ungroup()
+
+#Limit observations to newmoons in the forecasts
+obs_data_newmoon = obs_data_newmoon %>%
+  filter(NewMoonNumber >= 495)
+
+ggplot(for_data, aes(x=NewMoonNumber, y=estimate, color=as.factor(initial_newmoon), group=as.factor(initial_newmoon))) +
+         geom_line() + 
+         geom_point() +
+         geom_line(data=obs_data_newmoon, aes(x=NewMoonNumber, y=total), inherit.aes = FALSE)
+
+```
