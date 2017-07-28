@@ -3,7 +3,11 @@
 ---
   
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
 library(dplyr)
 library(PortalDataSummaries)
 source("forecast_tools.R")
@@ -14,27 +18,72 @@ source("forecast_tools.R")
 Recent forecasts and the actual observations
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-obs_data = PortalDataSummaries::abundance()
-obs_data$total = rowSums(select(obs_data, -period))
-new_moon_file = PortalDataSummaries::FullPath('PortalData/Rodents/moon_dates.csv', 
-                                                  '~')
+new_moon_file = PortalDataSummaries::FullPath('PortalData/Rodents/moon_dates.csv', '~')
 new_moons = read.csv(new_moon_file)
-obs_data_newmoon = inner_join(obs_data, new_moons, by = c("period" = "Period"))
 
-#Get the 3 most recent forecasts
-for_data = compile_forecasts() %>%
-  dplyr::filter(level == 'All', model == 'Ensemble', species == 'total') %>%
-  dplyr::group_by(initial_newmoon) %>%
-  dplyr::top_n(30, initial_newmoon) %>%
-  dplyr::ungroup()
+#Get the 12 most recent observations
+#Currently pretending it's newmoon 425 (Oct. 2011) for testing sake
+observation_data = PortalDataSummaries::abundance(shape='flat', level='Site') %>%
+  group_by(period) %>%
+  summarise(actual=sum(abundance)) %>%
+  ungroup() %>%
+  mutate(level='All',currency='abundance',species='total') %>%
+  left_join(new_moons, by=c('period'='Period')) %>%
+  #top_n(12, NewMoonNumber)
+  filter(NewMoonNumber %in% 413:425)
 
-#Limit observations to newmoons in the forecasts
-obs_data_newmoon = obs_data_newmoon %>%
-  filter(NewMoonNumber >= 495)
+#Get the all the forecasts made during observation period
+#Also only keep every other one so it doesn't clog up the graph
+forecast_data = compile_forecasts(use_hindcasts = TRUE) %>%
+  filter(level == 'All', model == 'Ensemble', species == 'total') %>%
+  filter(NewMoonNumber %in% observation_data$NewMoonNumber) %>%
+  filter(initial_newmoon %in% c(407,413,415,419)) %>%
+  distinct()
 
-ggplot(for_data, aes(x=NewMoonNumber, y=estimate, color=as.factor(initial_newmoon), group=as.factor(initial_newmoon))) +
-         geom_line() + 
-         geom_point() +
-         geom_line(data=obs_data_newmoon, aes(x=NewMoonNumber, y=total), inherit.aes = FALSE)
+#Join in the observations for all forecasts
+forecast_data = forecast_data %>%
+  left_join(observation_data, by=c('level','currency','NewMoonNumber','species'))
+
+ggplot(forecast_data, aes(x=NewMoonNumber, y=estimate, color=as.factor(initial_newmoon), group=as.factor(initial_newmoon))) +
+  geom_ribbon(aes(ymin = LowerPI, ymax = UpperPI, fill=as.factor(initial_newmoon)))+    
+  geom_line(size=2) + 
+  geom_point() +
+  geom_line(data=observation_data, aes(x=NewMoonNumber, y=actual), size=2, inherit.aes = FALSE) +
+  theme_bw()+
+  labs(colour = "Forecast Start Point", 
+       fill = "Forecast Start Point",
+       y='Total Rodents')
+
+ggplot(forecast_data, aes(x=NewMoonNumber, y=estimate)) +
+  geom_ribbon(aes(ymin = LowerPI, ymax = UpperPI)) +    
+  geom_line() + 
+  geom_point() +
+  facet_grid(as.factor(initial_newmoon)~.) +
+
+```
+
+# How do the models work on past data?
+
+By making hindcasts on the entire Portal history, we can judge the overal performance of our models. 
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+new_moon_file = PortalDataSummaries::FullPath('PortalData/Rodents/moon_dates.csv', '~')
+new_moons = read.csv(new_moon_file)
+
+#Get the 12 most recent observations
+observation_data = PortalDataSummaries::abundance(shape='flat', level='Site') %>%
+  group_by(period) %>%
+  summarise(actual=sum(abundance)) %>%
+  ungroup() %>%
+  mutate(level='All',currency='abundance',species='total') %>%
+  left_join(new_moons, by=c('period'='Period'))
+
+#Get the all the forecasts made during observation period
+forecast_data = compile_forecasts(use_hindcasts = TRUE) 
+
+forecast_errors = calculate_forecast_error(observation_data, forecast_data)
+
+plot_lead_time_errors(forecast_errors, level='All', species='Total', currency='Abundance', error_metric = 'MSE')
+
 
 ```
