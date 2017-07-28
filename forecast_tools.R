@@ -259,6 +259,22 @@ forecast_is_valid=function(forecast_df, verbose=FALSE){
   return(is_valid)
 }
 
+#Attempt to add updated columns to older forecast formats
+#See https://github.com/weecology/portalPredictions/issues/79
+
+#' @param forecast_df dataframe A dataframe read from a raw forecast file
+#' @return dataframe
+add_updated_columns = function(forecast_df){
+  #This was always 217 for the old forecast set
+  forecast_df$fit_start_newmoon = as.integer(217)
+  
+  #Both of these were always the newmoon immediately prior to
+  #the the forecast newmoon. 
+  forecast_df$fit_end_newmoon = as.integer(min(forecast_df$NewMoonNumber) - 1)
+  forecast_df$initial_newmoon = as.integer(min(forecast_df$NewMoonNumber) - 1)
+  
+  return(forecast_df)
+}
 
 #' Collect all separate forecasts file into a single dataframe.
 #'
@@ -288,7 +304,15 @@ compile_forecasts=function(forecast_folder='./predictions', verbose=FALSE){
     }
 
     if(verbose) print(paste('Testing file ',this_forecast_file,sep=''))
-    if(forecast_is_valid(this_forecast_data, verbose=verbose)){
+    
+    forecast_validity = forecast_is_valid(this_forecast_data, verbose = verbose)
+    #Try adding columns for the older forecast formats. 
+    if(!forecast_validity){
+      this_forecast_data = add_updated_columns(this_forecast_data)
+    }
+    forecast_validity = forecast_is_valid(this_forecast_data)
+    
+    if(forecast_validity){
       if(verbose) {
         print(paste('File format is valid: ', this_forecast_file, sep=''))
         print('-------')
