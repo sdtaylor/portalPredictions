@@ -153,7 +153,7 @@ calculate_forecast_error = function(observations, forecasts, error_metric='MSE',
   if(error_metric == 'MSE'){
     comparisons = forecasts %>%
       inner_join(observations, by=c('NewMoonNumber','currency','level','species')) %>%
-      group_by(date, model, NewMoonNumber, currency, level, species) %>%
+      group_by(date, model, NewMoonNumber, currency, level, species, fit_start_newmoon, fit_end_newmoon, initial_newmoon) %>%
       summarise(error=(estimate-actual)^2) %>%
       ungroup()
   } else if(error_metric == 'Likelihood') {
