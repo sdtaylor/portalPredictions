@@ -45,7 +45,7 @@ forecast_data = forecast_data %>%
   left_join(observation_data, by=c('level','currency','NewMoonNumber','species'))
 
 ggplot(forecast_data, aes(x=NewMoonNumber, y=estimate, color=as.factor(initial_newmoon), group=as.factor(initial_newmoon))) +
-  geom_ribbon(aes(ymin = LowerPI, ymax = UpperPI, fill=as.factor(initial_newmoon)))+    
+  geom_ribbon(aes(ymin = LowerPI, ymax = UpperPI, fill=as.factor(initial_newmoon)), alpha=0.2)+    
   geom_line(size=2) + 
   geom_point() +
   geom_line(data=observation_data, aes(x=NewMoonNumber, y=actual), size=2, inherit.aes = FALSE) +
@@ -55,10 +55,12 @@ ggplot(forecast_data, aes(x=NewMoonNumber, y=estimate, color=as.factor(initial_n
        y='Total Rodents')
 
 ggplot(forecast_data, aes(x=NewMoonNumber, y=estimate)) +
-  geom_ribbon(aes(ymin = LowerPI, ymax = UpperPI)) +    
-  geom_line() + 
+  geom_ribbon(aes(ymin = LowerPI, ymax = UpperPI), fill='blue', alpha=0.2) +    
+  geom_line(color='blue') + 
   geom_point() +
+  geom_line(aes(x=NewMoonNumber, y=actual), size=2, inherit.aes = FALSE) +
   facet_grid(as.factor(initial_newmoon)~.) +
+  labs(y='Total Rodents')
 
 ```
 
